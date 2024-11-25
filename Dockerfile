@@ -10,7 +10,8 @@ ARG ICON="cube"
 ARG ARCH
 ARG DISTRO=daffy
 ARG DOCKER_REGISTRY=docker.io
-ARG BASE_IMAGE=dt-ros-commons
+#ARG BASE_IMAGE=dt-ros-commons
+ARG BASE_IMAGE=dt-machine-learning-base-pytorch
 ARG BASE_TAG=${DISTRO}-${ARCH}
 ARG LAUNCHER=default
 

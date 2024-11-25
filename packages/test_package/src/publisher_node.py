@@ -27,7 +27,7 @@ class WheelControlNode(DTROS):
         self._vel_right = W_RIGHT * wheel_radius
         # construct publisher
         self._publisher = rospy.Publisher(wheels_topic, WheelsCmdStamped, queue_size=1)
-
+        print("hey")
     def run(self):
         # publish 10 messages every second (10 Hz)
         rate = rospy.Rate(0.1)
