@@ -16,8 +16,8 @@ ARG BASE_TAG=${DISTRO}-${ARCH}
 ARG LAUNCHER=default
 
 # define base image
-FROM ${DOCKER_REGISTRY}/duckietown/${BASE_IMAGE}:${BASE_TAG} as base
-
+#FROM ${DOCKER_REGISTRY}/duckietown/${BASE_IMAGE}:${BASE_TAG} as base
+FROM docker.io/simnol003/duckiebot-ml
 # recall all arguments
 ARG DISTRO
 ARG REPO_NAME
@@ -68,6 +68,8 @@ COPY ./packages "${REPO_PATH}/packages"
 RUN . /opt/ros/${ROS_DISTRO}/setup.sh && \
   catkin build \
     --workspace ${CATKIN_WS_DIR}/
+
+#COPY ./models "${REPO_PATH}/models"
 
 # install launcher scripts
 COPY ./launchers/. "${LAUNCH_PATH}/"

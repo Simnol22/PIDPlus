@@ -11,12 +11,14 @@ from cv_bridge import CvBridge
 import numpy as np
 from PIL import Image
 import torch
+from torchvision import transforms
 
 from pid_controller import PIDController
+from lane_detection_model import LaneDetectionCNN
 
 class ModelNode(DTROS):
     def __init__(self, node_name):
-        super(ModelNode, self).__init__(node_name=node_name, node_type=NodeType.LOCALIZATION)
+        super(ModelNode, self).__init__(node_name=node_name, node_type=NodeType.VISUALIZATION)
         
         # Reads data from the camera, preprocesses it and sends it through the model
         # Outputs the prediction to the a topic
@@ -25,98 +27,119 @@ class ModelNode(DTROS):
         self._bridge = CvBridge()
 
         # create window if necessary
-        self._window = "camera-reader"
+        self._window = "model-node"
         cv2.namedWindow(self._window, cv2.WINDOW_AUTOSIZE)
         # construct subscriber
         self.sub = rospy.Subscriber(self._camera_topic, CompressedImage, self.callback)
         # create publisher
         self.pub = rospy.Publisher('prediction', Float32, queue_size=10)
         
+        self.model_type = "CNN"
         self.model = None
-        self.load_model()
-    
+        
+        if self.model_type == "CNN":
+            self.model = LaneDetectionCNN((3, 224, 224))
+            self.load_model("packages/test_package/src/model/latest_cnn.pth")
+
+        elif self.model_type == "RNN":
+            ...
+
+        #Transformations to apply to an image before sending it to the model
+        self.transformCNN = transforms.Compose([
+            transforms.Lambda(self.apply_preprocessing_cnn),
+            transforms.Lambda(Image.fromarray),
+            transforms.Resize((224, 224)),
+            transforms.GaussianBlur(3, sigma=(0.1, 2.0)),
+            transforms.ToTensor()  # Convert to tensor
+        ])
+
     def load_model(self, model_path):
         # Load the model
-        self.model = torch.load(model_path)
+        self.model.load_state_dict(torch.load(model_path,map_location=torch.device('cpu')))
         self.model.eval()
-
 
     def callback(self, msg):
         # convert JPEG bytes to CV image
         image = self._bridge.compressed_imgmsg_to_cv2(msg)
-        # preprocess image
-        image = self.preprocess(image)
+        im = image
+        # preprocess image for viz
+        if self.model_type == "CNN":
+            im = self.apply_preprocessing_cnn(im)
+        
+        cv2.imshow(self._window, im)
+        cv2.waitKey(1)
         # send image through model
         if self.model is not None:
-            prediction = self.model(image)
-            # publish prediction
-            self.pub.publish(prediction)
+            image_tensor = None
+            if self.model_type == "CNN":
+                image_tensor = self.transformCNN(image)
+                image_tensor = image_tensor.unsqueeze(0)  # Add batch dimension
+            
+            elif self.model_type == "RNN":
+                #Apply transformation for RNN
+                ...
+            if image_tensor is not None:
+                prediction = self.model(image_tensor)
+                self.pub.publish(prediction.item())
 
-    def apply_preprocessing(image):
-       """
-       Apply preprocessing transformations to the input image.
+    def apply_preprocessing_cnn(self, image):
+        """
+        Apply preprocessing transformations to the input image only for the CNN network
 
-       Parameters:
-       - image: PIL Image object.
-       """
-       image_array = np.array(image)
-       channels = [image_array[:, :, i] for i in range(image_array.shape[2])]
-       h, w, _ = image_array.shape
+        Parameters:
+        - image: PIL Image object.
+        returns np array of preprocessed image
+        """
 
-       imghsv = cv2.cvtColor(image_array, cv2.COLOR_RGB2HSV)
-       img = cv2.cvtColor(image_array, cv2.COLOR_RGB2GRAY)
+        image_array = np.array(image)
+        channels = [image_array[:, :, i] for i in range(image_array.shape[2])]
+        h, w, _ = image_array.shape
 
-       mask_ground = np.ones(img.shape, dtype=np.uint8)  # Start with a mask of ones (white)
+        imghsv = cv2.cvtColor(image_array, cv2.COLOR_BGR2HSV)
 
+        img = cv2.cvtColor(image_array, cv2.COLOR_BGR2GRAY)
 
-       one_third_height = h // 3
-       mask_ground[:one_third_height, :] = 0  # Mask the top 1/3 of the image
+        mask_ground = np.ones(img.shape, dtype=np.uint8)  # Start with a mask of ones (white)
+        mid_point = img.shape[0] // 2  # Integer division to get the middle row index
 
-       #gaussian filter
-       sigma = 4.5
-       img_gaussian_filter = cv2.GaussianBlur(img,(0,0), sigma)
+        # Set the top half of the image to 0 (black)
+        mask_ground[:mid_point-30, :] = 0  # Mask the top half (rows 0 to mid_point-1)
 
-       sobelx = cv2.Sobel(img_gaussian_filter,cv2.CV_64F,1,0)
-       sobely = cv2.Sobel(img_gaussian_filter,cv2.CV_64F,0,1)
-       # Compute the magnitude of the gradients
-       Gmag = np.sqrt(sobelx*sobelx + sobely*sobely)
-       threshold = 50
+        #gaussian filter
+        sigma = 3.5
+        img_gaussian_filter = cv2.GaussianBlur(img,(0,0), sigma)
 
+        sobelx = cv2.Sobel(img_gaussian_filter,cv2.CV_64F,1,0)
+        sobely = cv2.Sobel(img_gaussian_filter,cv2.CV_64F,0,1)
+        # Compute the magnitude of the gradients
+        Gmag = np.sqrt(sobelx*sobelx + sobely*sobely)
+        threshold = 35
+        mask_mag = (Gmag > threshold)
+            #4 Mask yellow and white
 
-       white_lower_hsv = np.array([0,(0*255)/100,(60*255)/100]) # [0,0,50] - [230,100,255]
-       white_upper_hsv = np.array([150,(40*255)/100,(100*255)/100])   # CHANGE ME
+        white_lower_hsv = np.array([0,(0*255)/100,(60*255)/100]) # [0,0,50] - [230,100,255]
+        white_upper_hsv = np.array([150,(40*255)/100,(100*255)/100])   # CHANGE ME
 
-       yellow_lower_hsv = np.array([(30*179)/360, (30*255)/100, (30*255)/100])        # CHANGE ME
-       yellow_upper_hsv = np.array([(90*179)/360, (110*255)/100, (100*255)/100])  # CHANGE ME
+        yellow_lower_hsv = np.array([(30*179)/360, (30*255)/100, (30*255)/100])        # CHANGE ME
+        yellow_upper_hsv = np.array([(90*179)/360, (110*255)/100, (100*255)/100])  # CHANGE ME
+        mask_white = cv2.inRange(imghsv, white_lower_hsv, white_upper_hsv)
+        mask_yellow = cv2.inRange(imghsv, yellow_lower_hsv, yellow_upper_hsv)
 
-       mask_white = cv2.inRange(imghsv, white_lower_hsv, white_upper_hsv)
-       mask_yellow = cv2.inRange(imghsv, yellow_lower_hsv, yellow_upper_hsv)
+        mask_sobelx_pos = (sobelx > 0)
+        mask_sobelx_neg = (sobelx < 0)
+        mask_sobely_pos = (sobely > 0)
+        mask_sobely_neg = (sobely < 0)
 
-
-       mask_mag = (Gmag > threshold)
-
-       # np.savetxt("mask.txt", mask_white, fmt='%d', delimiter=',')
-       # exit()
-
-       final_mask = mask_ground * mask_mag * 255 
-       mask_white = mask_ground * mask_white
-       mask_yellow = mask_ground * mask_yellow
-       # Convert the NumPy array back to a PIL image
-
-       channels[0] =  np.zeros_like(channels[0])# final_mask
-       channels[1] =  np.zeros_like(channels[1]) #mask_white
-       channels[2] =  mask_yellow
-
-       filtered_image = np.stack(channels, axis=-1)
-       #filtered_image = Image.fromarray(filtered_image)
-       
-       # TODO: Missing steps here for transforming to a tensor and resizing it
-       return  filtered_image
+        final_mask = mask_ground * mask_mag  * (mask_white + mask_yellow) #* (mask_sobelx_neg * mask_sobely_neg + mask_sobelx_pos* mask_sobely_pos)
+        # Convert the NumPy array back to a PIL image
+        for channel in channels:
+            channel *= final_mask
+        filtered_image = np.stack(channels, axis=-1)
+    
+        return filtered_image
 
 if __name__ == '__main__':
     # create the node
-    node = ModelNode(node_name='wheel_control_node')
-    # run node
-    node.run()
+    node = ModelNode(node_name='model_node')
     # keep the process from terminating
     rospy.spin()
