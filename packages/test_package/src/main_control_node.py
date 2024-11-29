@@ -8,6 +8,7 @@ from duckietown_msgs.msg import WheelsCmdStamped
 
 from pid_controller import PIDController
 import numpy as np
+import time
 
 class MaintControlNode(DTROS):
     def __init__(self, node_name):
@@ -21,7 +22,7 @@ class MaintControlNode(DTROS):
         
         self.radius = 0.0318  # meters, default value of wheel radius
         self.baseline = 0.1  # meters, default value of baseline
-        self.gain = 0.3
+        self.gain = 0.4
         self.k = 27
         self.trim = 0
 
@@ -35,17 +36,16 @@ class MaintControlNode(DTROS):
 
     def callback(self, data):
         self.last_prediction = data.data
-        #rospy.loginfo("Predicted : '%s'", data.data)
+        rospy.loginfo("Predicted : '%s'", data.data)
 
     def run(self):
         # Determine at what frequence we want to update the PID, 
         # and calculate delat_time
-        dt = 5
-        rate = rospy.Rate(dt)
+        dt = 50/1000
         while not rospy.is_shutdown():
             action = self.controller.get_action(self.last_prediction,dt)
             self.go(action)
-            rate.sleep()
+            time.sleep(50/1000)
         
         #Call the PID controller 
         #self.controller.compute(self.last_prediction)
@@ -77,9 +77,9 @@ class MaintControlNode(DTROS):
         vels = np.array([u_l_limited, u_r_limited])
 
         message = WheelsCmdStamped(vel_left=vels[0], vel_right=vels[1])
-        print("left vel : ", vels[0])
-        print("right vel : ", vels[1])
-        self._publisher.publish(message)
+        #print("left vel : ", vels[0])
+        #print("right vel : ", vels[1])
+        #self._publisher.publish(message)
 
 
 if __name__ == '__main__':

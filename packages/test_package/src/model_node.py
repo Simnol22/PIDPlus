@@ -43,7 +43,7 @@ class ModelNode(DTROS):
 
         elif self.model_type == "RNN":
             ...
-
+        self.i = 0
         #Transformations to apply to an image before sending it to the model
         self.transformCNN = transforms.Compose([
             transforms.Lambda(self.apply_preprocessing_cnn),
@@ -63,25 +63,27 @@ class ModelNode(DTROS):
         image = self._bridge.compressed_imgmsg_to_cv2(msg)
         im = image
         # preprocess image for viz
-        if self.model_type == "CNN":
-            im = self.apply_preprocessing_cnn(im)
-        
-        cv2.imshow(self._window, im)
-        cv2.waitKey(1)
-        # send image through model
-        if self.model is not None:
-            image_tensor = None
+        if self.i >5:
+            self.i = 0
             if self.model_type == "CNN":
-                image_tensor = self.transformCNN(image)
-                image_tensor = image_tensor.unsqueeze(0)  # Add batch dimension
-            
-            elif self.model_type == "RNN":
-                #Apply transformation for RNN
-                ...
-            if image_tensor is not None:
-                prediction = self.model(image_tensor)
-                self.pub.publish(prediction.item())
+                im = self.apply_preprocessing_cnn(im)
 
+            cv2.imshow(self._window, im)
+            cv2.waitKey(1)
+            # send image through model
+            if self.model is not None:
+                image_tensor = None
+                if self.model_type == "CNN":
+                    image_tensor = self.transformCNN(image)
+                    image_tensor = image_tensor.unsqueeze(0)  # Add batch dimension
+
+                elif self.model_type == "RNN":
+                    #Apply transformation for RNN
+                    ...
+                if image_tensor is not None:
+                    prediction = self.model(image_tensor)
+                    self.pub.publish(prediction.item())
+        self.i += 1
     def apply_preprocessing_cnn(self, image):
         """
         Apply preprocessing transformations to the input image only for the CNN network
