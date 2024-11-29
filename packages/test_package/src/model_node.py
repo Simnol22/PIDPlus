@@ -59,6 +59,7 @@ class ModelNode(DTROS):
         transforms.ToTensor(),  # Convert image to tensor
         ])
         self.last_time = 0
+        self.last_image = None
           # construct subscriber
         self.sub = rospy.Subscriber(self._camera_topic, CompressedImage, self.callback)
         # create publisher
@@ -68,39 +69,44 @@ class ModelNode(DTROS):
         # Load the model
         self.model.load_state_dict(torch.load(model_path,map_location=torch.device('cpu')))
         self.model.eval()
+    
+    def run(self):
+        while not rospy.is_shutdown():
+            image = self.last_image
+            # send image through model
+            if self.model is not None and image is not None:
+                image_tensor = None
+                if self.model_type == "CNN":
+                    image_tensor = self.transformCNN(image)
+                    im = image_tensor.permute(1, 2, 0).cpu().numpy()
+                    cv2.imshow(self._window, im)
+                    cv2.waitKey(1)
+                    image_tensor = image_tensor.unsqueeze(0)  # Add batch dimension
+                elif self.model_type =="CNN2":
+                    image_tensor = self.transformCNN2(image)
+                    image_tensor = image_tensor.unsqueeze(0)  # Add batch dimension
+                elif self.model_type == "RNN":
+                    #Apply transformation for RNN
+                    ...
+                if image_tensor is not None:
+                    prediction = self.model(image_tensor)
+                    self.pub.publish(prediction.item())
 
     def callback(self, msg):
         # convert JPEG bytes to CV image
         image = self._bridge.compressed_imgmsg_to_cv2(msg)
         im = image
-        print("callback time : ", time.time() - self.last_time)
-        self.last_time = time.time()
-        # preprocess image for viz
-        #if self.i > 0:
-        #    self.i = 0
-        #    if self.model_type == "CNN":
-        #        im = self.apply_preprocessing_cnn(im)
-        #    elif self.model_type == "CNN2":
-        #        im = self.apply_preprocessing_cnn2(im)
-    #
-        #    cv2.imshow(self._window, im)
-        #    cv2.waitKey(1)
-        #    # send image through model
-        #    if self.model is not None:
-        #        image_tensor = None
-        #        if self.model_type == "CNN":
-        #            image_tensor = self.transformCNN(image)
-        #            image_tensor = image_tensor.unsqueeze(0)  # Add batch dimension
-        #        elif self.model_type =="CNN2":
-        #            image_tensor = self.transformCNN2(image)
-        #            image_tensor = image_tensor.unsqueeze(0)  # Add batch dimension
-        #        elif self.model_type == "RNN":
-        #            #Apply transformation for RNN
-        #            ...
-        #        if image_tensor is not None:
-        #            prediction = self.model(image_tensor)
-        #            self.pub.publish(prediction.item())
-        #self.i += 1
+
+        self.last_image = image
+        #self.last_time = time.time()
+        #if self.model_type == "CNN":
+        #    im = self.apply_preprocessing_cnn(image)
+        #elif self.model_type == "CNN2":
+        #    im = self.apply_preprocessing_cnn2(image)
+#
+        #cv2.imshow(self._window, im)
+        #cv2.waitKey(1)
+
     def apply_preprocessing_cnn(self, image):
         """
         Apply preprocessing transformations to the input image only for the CNN network
@@ -240,5 +246,7 @@ class ModelNode(DTROS):
 if __name__ == '__main__':
     # create the node
     node = ModelNode(node_name='model_node')
+
+    node.run()
     # keep the process from terminating
     rospy.spin()
