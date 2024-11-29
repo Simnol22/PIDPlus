@@ -43,10 +43,12 @@ class MaintControlNode(DTROS):
         # and calculate delat_time
         dt = 50/1000
         while not rospy.is_shutdown():
+            start_time = time.time()
             action = self.controller.get_action(self.last_prediction,dt)
             self.go(action)
             time.sleep(50/1000)
-        
+            dt = (time.time() - start_time)
+
         #Call the PID controller 
         #self.controller.compute(self.last_prediction)
       
