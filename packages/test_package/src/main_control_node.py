@@ -50,7 +50,6 @@ class MaintControlNode(DTROS):
             dt = (time.time() - start_time)
 
         #Call the PID controller 
-        #self.controller.compute(self.last_prediction)
       
     def go(self, action):
         #Sends voltage to wheels from action
@@ -81,7 +80,7 @@ class MaintControlNode(DTROS):
         message = WheelsCmdStamped(vel_left=vels[0], vel_right=vels[1])
         #print("left vel : ", vels[0])
         #print("right vel : ", vels[1])
-        #self._publisher.publish(message)
+        self._publisher.publish(message)
 
 
 if __name__ == '__main__':
