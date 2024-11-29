@@ -22,12 +22,12 @@ class MaintControlNode(DTROS):
         
         self.radius = 0.0318  # meters, default value of wheel radius
         self.baseline = 0.1  # meters, default value of baseline
-        self.gain = 0.4
+        self.gain = 0.7
         self.k = 27
         self.trim = 0
 
         self.limit = 1
-        self.controller = PIDController(kp=50, ki=0.3, kd=50)
+        self.controller = PIDController(kp=13, ki=0, kd=10)
         self.last_time = time.time()
         self.sub = rospy.Subscriber('prediction', Float32, self.callback)
         self.last_prediction = 0
@@ -36,16 +36,13 @@ class MaintControlNode(DTROS):
         
 
     def callback(self, data):
-        self.last_prediction = data.data
-        print("callback time : ", time.time() - self.last_time)
-        self.last_time = time.time()
         dt = time.time() - self.last_time
         self.last_time = time.time()
-        rospy.loginfo("Predicted : '%s', dt : %d", data.data, dt)
-        
-        action = self.controller.get_action(self.last_prediction,dt)
-        #print("action : ", action)
+        rospy.loginfo("Predicted : '%s', dt : %s", data.data, str(dt))
+        prediction = data.data*0.80 + self.last_prediction*0.20      
+        action = self.controller.get_action(prediction,dt)
         self.go(action)
+        self.last_prediction = prediction
 
 
     def run(self):
@@ -87,7 +84,7 @@ class MaintControlNode(DTROS):
 
         vels = np.array([u_l_limited, u_r_limited])
 
-        message = WheelsCmdStamped(vel_left=0, vel_right=0)
+        message = WheelsCmdStamped(vel_left=vels[0], vel_right=vels[1])
         #print("left vel : ", vels[0])
         #print("right vel : ", vels[1])
         self._publisher.publish(message)

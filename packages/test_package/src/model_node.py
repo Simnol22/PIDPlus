@@ -78,9 +78,9 @@ class ModelNode(DTROS):
                 image_tensor = None
                 if self.model_type == "CNN":
                     image_tensor = self.transformCNN(image)
-                    im = image_tensor.permute(1, 2, 0).cpu().numpy()
-                    cv2.imshow(self._window, im)
-                    cv2.waitKey(1)
+                    #im = image_tensor.permute(1, 2, 0).cpu().numpy()
+                    #cv2.imshow(self._window, im)
+                    #cv2.waitKey(1)
                     image_tensor = image_tensor.unsqueeze(0)  # Add batch dimension
                 elif self.model_type =="CNN2":
                     image_tensor = self.transformCNN2(image)
