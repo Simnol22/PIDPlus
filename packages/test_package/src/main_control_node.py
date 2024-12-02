@@ -5,7 +5,7 @@ import rospy
 from duckietown.dtros import DTROS, NodeType
 from std_msgs.msg import Float32
 from duckietown_msgs.msg import WheelsCmdStamped
-
+from kalman_filter import KalmanFilter
 from pid_controller import PIDController
 import numpy as np
 import time
@@ -27,22 +27,40 @@ class MaintControlNode(DTROS):
         self.trim = 0
 
         self.limit = 1
-        self.controller = PIDController(kp=13, ki=0, kd=10)
+        self.controller = PIDController(kp=12, ki=0, kd=12)
         self.last_time = time.time()
+        self.kalman_filter = None
+        self.init_kalman()
         self.sub = rospy.Subscriber('prediction', Float32, self.callback)
         self.last_prediction = 0
 
         self._publisher = rospy.Publisher(wheels_topic, WheelsCmdStamped, queue_size=1)
-        
+                
+    def init_kalman(self):
+        # Initialize the Kalman filter
+        F = np.array([[1, 0.05], [0, 1]])
+        B = np.array([[0.05], [0]])
+        H = np.array([[1, 0]])
+        Q = np.array([[0.01, 0], [0, 0.01]])
+        R = np.array([[0.01]])
+        x0 = np.array([[0], [0]])
+        P0 = np.array([[1, 0], [0, 1]])
+        self.kalman_filter = KalmanFilter(F, B, H, Q, R, x0, P0)
 
     def callback(self, data):
         dt = time.time() - self.last_time
         self.last_time = time.time()
-        rospy.loginfo("Predicted : '%s', dt : %s", data.data, str(dt))
-        prediction = data.data*0.80 + self.last_prediction*0.20      
-        action = self.controller.get_action(prediction,dt)
+        # predict and update the kalman filter
+        if self.kalman_filter is not None:
+            pred = self.kalman_filter.predict(np.array([[data.data]]))[0]
+            self.kalman_filter.update(np.array([[data.data]]))
+            rospy.loginfo("Predicted : '%s', kalman : '%s',  dt : %s", data.data,str(pred[0]), str(dt))
+
+            #print("Kalman Predicted : ", pred)
+        #prediction = data.data*0.80 + self.last_prediction*0.20      
+        action = self.controller.get_action(pred[0],dt)
         self.go(action)
-        self.last_prediction = prediction
+        self.last_prediction = pred[0]
 
 
     def run(self):
