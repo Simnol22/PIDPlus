@@ -21,13 +21,13 @@ class MaintControlNode(DTROS):
         wheels_topic = f"/{vehicle_name}/wheels_driver_node/wheels_cmd"
         
         self.radius = 0.0318  # meters, default value of wheel radius
-        self.baseline = 0.1  # meters, default value of baseline
-        self.gain = 0.7
+        self.baseline = 0.099  # meters, default value of baseline
+        self.gain = 0.70
         self.k = 27
         self.trim = 0
 
         self.limit = 1
-        self.controller = PIDController(kp=12, ki=0, kd=12)
+        self.controller = PIDController(kp=13, ki=0, kd=8)
         self.last_time = time.time()
         self.kalman_filter = None
         self.init_kalman()
@@ -57,10 +57,13 @@ class MaintControlNode(DTROS):
             rospy.loginfo("Predicted : '%s', kalman : '%s',  dt : %s", data.data,str(pred[0]), str(dt))
 
             #print("Kalman Predicted : ", pred)
-        #prediction = data.data*0.80 + self.last_prediction*0.20      
-        action = self.controller.get_action(pred[0],dt)
+        prediction = pred[0]#*0.80 + self.last_prediction*0.20      
+        action = self.controller.get_action(prediction,dt)
+        self.last_prediction = prediction
         self.go(action)
-        self.last_prediction = pred[0]
+        # action = self.controller.get_action(pred[0],dt)
+        # self.go(action)
+        # self.last_prediction = pred[0]
 
 
     def run(self):
@@ -75,7 +78,7 @@ class MaintControlNode(DTROS):
             dt = (time.time() - start_time)
 
         #Call the PID controller 
-      
+        
     def go(self, action):
         #Sends voltage to wheels from action
 
