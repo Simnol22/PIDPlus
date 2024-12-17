@@ -1,8 +1,8 @@
 <package>
-  <name>test_package</name>
+  <name>pidplus</name>
   <version>0.0.1</version>
   <description>
-  My first Catkin package in Duckietown.
+  My second Catkin package in Duckietown.
   </description>
   <maintainer email="simonkirbi@hotmail.com">Simon-Olivier Duguay</maintainer>
   <license>None</license>

@@ -36,11 +36,11 @@ class ModelNode(DTROS):
         
         if self.model_type == "CNN":
             self.model = LaneDetectionCNN((3, 224, 224))
-            self.load_model("packages/test_package/src/model/latest_cnn.pth")
+            self.load_model("packages/pidplus/src/model/latest_cnn.pth")
 
         elif self.model_type == "CNN2":
             self.model = LaneDetectionCNN((3, 480, 640))
-            self.load_model("packages/test_package/src/model/latest_cnn2.pth")
+            self.load_model("packages/pidplus/src/model/latest_cnn2.pth")
 
         elif self.model_type == "RNN":
             ...
