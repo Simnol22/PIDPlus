@@ -1,6 +1,6 @@
 # PIDPlus
-
 A measurement model based on a CNN !
+This repository contains the code for system integraiong and real-world testing
 
 ## How to use it
 
